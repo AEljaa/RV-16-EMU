@@ -45,7 +45,7 @@ struct Memory {
             return;
         }
         for (size_t i = 0; i < MAX_MEM; i++) {
-            if (i % 16 == 0) outfile << std::endl; // 16 bytes per line
+            if ((i % 2 == 0) && (i !=0 )) outfile << std::endl; // 2 bytes per line (16 bits)
             outfile << std::hex << (int)ROM[i] << " ";
         }
         outfile.close();
