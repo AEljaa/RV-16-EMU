@@ -2,6 +2,9 @@
 #include <iostream>
 #include <stdlib.h>
 #include <stdint.h>  // Must have this!
+#include <fstream>
+#include <_stdio.h>
+#include <sstream>
 using std::uint8_t;
 using std::uint16_t;
 
@@ -9,12 +12,30 @@ struct Memory {
     static constexpr std::uint32_t MAX_MEM = 4096 * 16;
     std::uint8_t ROM[MAX_MEM];
     
-    void initialise(){
+    void initialise(const char* prog){
         std::cout << "Initialising memory" << std::endl;
         // Example initialization logic
-        //for(size_t i=0; i< MAX_MEM ; i++){
-        //    ROM[i] = 0; // or any other initialization
-        //}
+        for(size_t i=0; i< MAX_MEM ; i++){
+            ROM[i] = 0; // or any other initialization
+        }
+        std::ifstream infile(prog);
+        std::string line;
+        if (!infile) {
+            std::cerr << "Error opening file "<< std::endl;
+        }
+        
+        int index=0;
+        unsigned int a;
+
+        // Read and output each hex value until EOF
+        while (getline(infile, line)) {
+            std::istringstream(line) >> std::hex >> a;
+            ROM[index]=(a & 0x00FF);
+            ROM[index+1]=(a & 0xFF00) >> 8 ;
+            index+=2;
+        }
+        
+        std::cout << "Finished reading hex file." << std::endl;
     }
 
     std::uint8_t operator[] (std::uint16_t addr) const{
@@ -28,11 +49,13 @@ struct Memory {
 
 
 class CPU {
+
     public:
-    CPU(){
+    CPU(const char* prog, int maxC) : maxCycles(maxC) {
         this->reset();
-        this->load();
-        while(PC<20){
+        //this->load(prog);
+        this->mem.initialise(prog);
+        while( PC < this->maxCycles ){
             std::cout<<"Program Counter : "<< PC <<std::endl;
             std::cout<<"Fetching"<<std::endl;
             this->m_cinstruction=this->fetch();
@@ -44,37 +67,34 @@ class CPU {
         this->reset();
     };
 
-    void load(){
-        //load path
-        // for
-        mem[0]=0x03;
-        mem[1]=0x00;
-        mem[2]=0x04;
-        mem[3]=0x20;
-        mem[4]=0x05;
-        mem[5]=0x40;
-        mem[6]=0x06;
-        mem[7]=0x60;
-        mem[8]=0x07;
-        mem[9]=0x80;
-        mem[10]=0x08;
-        mem[11]=0xA0;
-        mem[12]=0x09;
-        mem[13]=0xC0;
-        mem[14]=0x00;
-        mem[15]=0xE0;
+    void load(const char* path){
+        std::ifstream infile(path);
+        std::string line;
+        if (!infile) {
+            std::cerr << "Error opening file "<< std::endl;
+        }
+        
+        int index=0;
+        unsigned int a;
+
+        // Read and output each hex value until EOF
+        while (getline(infile, line)) {
+            std::istringstream(line) >> std::hex >> a;
+            this->mem[index]=(a & 0x00FF);
+            this->mem[index+1]=(a & 0xFF00) >> 8 ;
+            index+=2;
+        }
+        
+        std::cout << "Finished reading hex file." << std::endl;
     }
 
     private:
-    std::uint16_t reg[8];
-    std::uint16_t PC = 0;
-    std::uint16_t nextJumpOffset = 2;
-    std::uint16_t m_cinstruction=0x0000;
-    Memory mem;
-
     void reset(){
         this->PC=0;
-        for(int i = 0 ; i<100; i++ ){
+        this->nextJumpOffset=2;
+        this->JALR=0;
+        std::uint16_t m_cinstruction=0x0000;
+        for(int i = 0 ; i<8; i++ ){
             reg[i]=0;
         }
     }
@@ -86,7 +106,6 @@ class CPU {
     void DecAndEx(){
         std::uint8_t opcode= (m_cinstruction >> 13);
         int a = ((m_cinstruction >> 10) & 0x7 );
-        std::uint16_t jump;
         switch(opcode){
             case 0x0:{
                 int b = ((m_cinstruction >> 7) & 0x7 );
@@ -105,7 +124,6 @@ class CPU {
                 int b = ((m_cinstruction >> 7) & 0x7 );
                 int c = (m_cinstruction & 0x7);
                 this->reg[a]= (a != 0) ? !(this->reg[b] & this->reg[c]) : 0 ;
-                std::cout<<"======== reg c: "<<c<<std::endl;
              } break;
             case 0x3:{
                 std::cout<<"LUI instruction"<<std::endl;
@@ -119,7 +137,6 @@ class CPU {
                 std::uint16_t addr = this->reg[b] + imm;
                 mem[addr]= (this->reg[a] & 0xFF);//little endian so lsbs gets stored at lower mem address (store first byte at offset 0)
                 mem[addr+1]= (this->reg[a] << 8  & 0xFF00);//store second byte at offset 1
-    
              } break;
             case 0x5:{
                 std::cout<<"LW instruction"<<std::endl;
@@ -137,22 +154,32 @@ class CPU {
             case 0x7:{
                 std::cout<<"JALR instruction"<<std::endl;
                 int b = ((m_cinstruction >> 7) & 0x7 );
-                jump = this->reg[b] ;
+                this->nextJumpOffset = this->reg[b] ; //need pc to knwo it should chane its value to this 
                 this->reg[a] = (a != 0) ? (this->PC+2) : 0 ; 
+                this->JALR=1;
              } break;
         }
     }
 
     void nextClk(){
-        this->PC+=this->nextJumpOffset;
+        this->PC= this->JALR ? this->nextJumpOffset : this->PC + this->nextJumpOffset ;
         this->nextJumpOffset=2;
+        this->JALR=0;
     }
 
     //mem.initialise();
+    std::uint16_t reg[8];
+    std::uint16_t PC = 0;
+    std::uint16_t nextJumpOffset = 2;
+    std::uint16_t m_cinstruction=0x0000;
+    int maxCycles;
+    bool JALR=0;
+    Memory mem;
 
 };
 
 int main(){
-    CPU cpu;
+    //enter path
+    CPU cpu("main.hex",150);
     //cpu.load("../test/prog.hex");
 }
