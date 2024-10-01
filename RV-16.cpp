@@ -38,6 +38,20 @@ struct Memory {
         std::cout << "Finished reading hex file." << std::endl;
     }
 
+    void dump(const char* filename) {
+        std::ofstream outfile(filename);
+        if (!outfile) {
+            std::cerr << "Error opening file for memory dump: " << filename << std::endl;
+            return;
+        }
+        for (size_t i = 0; i < MAX_MEM; i++) {
+            if (i % 16 == 0) outfile << std::endl; // 16 bytes per line
+            outfile << std::hex << (int)ROM[i] << " ";
+        }
+        outfile.close();
+        std::cout << "Memory dump written to " << filename << std::endl;
+    }
+
     std::uint8_t operator[] (std::uint16_t addr) const{
         return ROM[addr];
     }
@@ -64,6 +78,7 @@ class CPU {
             std::cout<<"Next Clock Cycle"<<std::endl;
             this->nextClk();
         }
+        this->mem.dump("Finalmem.hex");
         this->reset();
     };
 
@@ -146,10 +161,11 @@ class CPU {
                 this->reg[a] = ((mem[addr+1] << 8 ) | mem[addr]);
              } break;
             case 0x6:{
-                std::cout<<"BEQ instruction"<<std::endl;
                 int b = ((m_cinstruction >> 7) & 0x7 );
                 std::uint16_t imm = (m_cinstruction & 0x7F );
                 this->nextJumpOffset = (this->reg[a] == this->reg[b]) ? (2+imm) : 2 ;
+                std::cout<<"BEQ instruction, Offset : "<<this->nextJumpOffset<<std::endl;
+
              } break;
             case 0x7:{
                 std::cout<<"JALR instruction"<<std::endl;
@@ -180,6 +196,6 @@ class CPU {
 
 int main(){
     //enter path
-    CPU cpu("main.hex",150);
+    CPU cpu("main.hex",2000);
     //cpu.load("../test/prog.hex");
 }
