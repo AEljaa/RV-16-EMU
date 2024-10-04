@@ -72,12 +72,11 @@ class CPU {
         this->mem.initialise(prog);
         this->instructionsExecuted("null");
         while( PC < this->maxCycles ){
-            std::cout<<"Program Counter : "<< PC <<std::endl;
-            std::cout<<"Fetching"<<std::endl;
+            //std::cout<<"Fetching"<<std::endl;
             this->m_cinstruction=this->fetch();
-            printf("Instruction: %.4X\n",m_cinstruction);
+            //printf("Instruction: %.4X\n",m_cinstruction);
             this->DecAndEx();
-            std::cout<<"Next Clock Cycle"<<std::endl;
+            //std::cout<<"Next Clock Cycle"<<std::endl;
             this->nextClk();
         }
         this->mem.dump("Finalmem.hex");
@@ -103,6 +102,10 @@ class CPU {
         }
         
         std::cout << "Finished reading hex file." << std::endl;
+    }
+
+    ~CPU(){
+        std::cout << "All exectuted instructions in ExectutedInstructions.txt" << std::endl;
     }
 
     private:
@@ -134,17 +137,15 @@ class CPU {
                 instructionsExecuted(instr.c_str()); 
             } break;
             case 0x1:{
-                std::cout<<"ADDI instruction"<<std::endl;
                 int b = ((m_cinstruction >> 7) & 0x7 );
                 std::uint16_t imm = (m_cinstruction & 0x7F );
                 this->reg[a]= (a != 0) ? this->reg[b]+imm : 0;
                 std::string instr = "ADDI Reg " + std::to_string(b) + " (" + std::to_string(this->reg[b]) + ")" +
-                    " and Xbit imm " + std::to_string(imm) + " (" + std::to_string(imm) + ")" +
+                    " and 7bit imm " + std::to_string(imm) + " (" + std::to_string(imm) + ")" +
                     " into Reg " + std::to_string(a) + " and now curr val: (" + std::to_string(this->reg[a]) + ")";
                 instructionsExecuted(instr.c_str()); 
              } break;
             case 0x2:{
-                std::cout<<"NAND instruction"<<std::endl;
                 int b = ((m_cinstruction >> 7) & 0x7 );
                 int c = (m_cinstruction & 0x7);
                 this->reg[a]= (a != 0) ? !(this->reg[b] & this->reg[c]) : 0 ;
@@ -154,15 +155,13 @@ class CPU {
                 instructionsExecuted(instr.c_str()); 
              } break;
             case 0x3:{
-                std::cout<<"LUI instruction"<<std::endl;
                 std::uint16_t imm = (m_cinstruction & 0x2FF );
                 this->reg[a]= (a != 0) ? (imm << 6) : 0 ; //Place the 10 ten bits of the 16-bit imm into the 10 ten bits of regA, setting the bottom 6 bits of regA to zero
-                std::string instr = "LUI Xbit " + std::to_string(imm) +
-                    " into Reg " + std::to_string(a) + " and now curr val: (" + std::to_string(this->reg[a]) + ")";
+                std::string instr = "LUI 10 bit " + std::to_string(imm) +
+                    " into Reg " + std::to_string(a) + " and now curr val 16bit: (" + std::to_string(this->reg[a]) + ")";
                 instructionsExecuted(instr.c_str()); 
              } break;
             case 0x4:{
-                std::cout<<"SW instruction"<<std::endl;
                 int b = ((m_cinstruction >> 7) & 0x7 );
                 std::uint16_t imm = (m_cinstruction & 0x7F );
                 std::uint16_t addr = this->reg[b] + imm;
@@ -173,7 +172,6 @@ class CPU {
                 instructionsExecuted(instr.c_str()); 
              } break;
             case 0x5:{
-                std::cout<<"LW instruction"<<std::endl;
                 int b = ((m_cinstruction >> 7) & 0x7 );
                 std::uint16_t imm = (m_cinstruction & 0x7F );
                 std::uint16_t addr = this->reg[b] + imm;
@@ -187,18 +185,15 @@ class CPU {
                 int b = ((m_cinstruction >> 7) & 0x7 );
                 std::uint16_t imm = (m_cinstruction & 0x7F );
                 this->nextJumpOffset = (this->reg[a] == this->reg[b]) ? (2+imm) : 2 ;
-                std::cout<<"BEQ instruction, Offset : "<<this->nextJumpOffset<<std::endl;
                 std::string instr = "BEQ Reg " + std::to_string(a) + " (" + std::to_string(this->reg[a]) + ")" +
                     " Reg " + std::to_string(b) + " (" + std::to_string(this->reg[b]) + ") Jumpoffset = "+ std::to_string(this->nextJumpOffset);
                 instructionsExecuted(instr.c_str());
              } break;
             case 0x7:{
-                std::cout<<"JALR instruction"<<std::endl;
                 int b = ((m_cinstruction >> 7) & 0x7 );
                 this->nextJumpOffset = this->reg[b] ; //need pc to know it should chane its value to this 
                 this->reg[a] = (a != 0) ? (this->PC+2) : 0 ; 
                 this->JALR=1;
-                std::cout<<"JALR instruction, Offset : "<<this->nextJumpOffset<<std::endl;
                 std::string instr = "JALR set PC with " + std::to_string(this->nextJumpOffset) + " and store Register " + std::to_string(a)+ " with "+ std::to_string(this->PC+2) + " if not 0 else reg0 stays 0" +
                     " JALR flag =  " + std::to_string(this->JALR);
                 instructionsExecuted(instr.c_str());
@@ -208,17 +203,17 @@ class CPU {
 
     void instructionsExecuted(const char* instruction){
         if(this->PC==0 && !this->IfileDeleted) {
-            if (std::remove("ExecutedInstructed.txt") != 0)
-                std::perror("Error deleting file");
+            if (std::remove("ExectutedInstructions.txt") != 0)
+                std::perror("Error deleting ExectutedInstructions.txt");
             else
-                std::puts("File successfully deleted");
+                std::puts("ExectutedInstructions.txt successfully deleted");
             
             this->IfileDeleted = true;
         }
 
         // Append the instruction to the file
         if(std::string(instruction) != "null"){
-            std::ofstream file("ExecutedInstructed.txt", std::ios_base::app);
+            std::ofstream file("ExectutedInstructions.txt", std::ios_base::app);
             file << "PC:"<<this->PC <<" "<<instruction << std::endl;  // Write the instruction with a newline for better readability
         }
     }
@@ -228,6 +223,8 @@ class CPU {
         this->nextJumpOffset=2;
         this->JALR=0;
     }
+
+
 
     //mem.initialise();
     std::uint16_t reg[8];
