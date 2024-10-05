@@ -80,6 +80,7 @@ class CPU {
             this->nextClk();
         }
         this->mem.dump("Finalmem.hex");
+        this->Regdump("FinalReg.txt");
         this->reset();
     };
 
@@ -148,7 +149,7 @@ class CPU {
             case 0x2:{
                 int b = ((m_cinstruction >> 7) & 0x7 );
                 int c = (m_cinstruction & 0x7);
-                this->reg[a]= (a != 0) ? !(this->reg[b] & this->reg[c]) : 0 ;
+                this->reg[a]= (a != 0) ? ~(this->reg[b] & this->reg[c]) : 0 ;
                 std::string instr = "NAND Reg " + std::to_string(b) + " (" + std::to_string(this->reg[b]) + ")" +
                     " and Reg " + std::to_string(c) + " (" + std::to_string(this->reg[c]) + ")" +
                     " into Reg " + std::to_string(a) + " and now curr val: (" + std::to_string(this->reg[a]) + ")";
@@ -224,7 +225,18 @@ class CPU {
         this->JALR=0;
     }
 
-
+     void Regdump(const char* filename) {
+        std::ofstream outfile(filename);
+        if (!outfile) {
+            std::cerr << "Error opening file for Reg dump: " << filename << std::endl;
+            return;
+        }
+        for (size_t i = 0; i < 8; i++) {
+            outfile << "Register " + std::to_string(i)+ " " + std::to_string(this->reg[i]) << "\n" ;
+        }
+        outfile.close();
+        std::cout << "Register dump written to " << filename << std::endl;
+    }   
 
     //mem.initialise();
     std::uint16_t reg[8];
