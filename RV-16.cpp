@@ -1,7 +1,7 @@
 #include <cstdint>
 #include <iostream>
 #include <stdlib.h>
-#include <stdint.h>  // Must have this!
+#include <stdint.h> 
 #include <fstream>
 #include <sstream>
 #include <stdio.h>
@@ -10,12 +10,11 @@ using std::uint8_t;
 using std::uint16_t;
 
 struct Memory {
-    static constexpr std::uint32_t MAX_MEM = 4096 * 16;
+    static constexpr std::uint32_t MAX_MEM = 8192 * 8;
     std::uint8_t ROM[MAX_MEM];
     
     void initialise(const char* prog){
         std::cout << "Initialising memory" << std::endl;
-        // Example initialization logic
         for(size_t i=0; i< MAX_MEM ; i++){
             ROM[i] = 0; // or any other initialization
         }
@@ -78,15 +77,11 @@ class CPU {
     public:
     CPU(const char* prog, int maxC) : maxCycles(maxC) {
         this->reset();
-        //this->load(prog);
         this->mem.initialise(prog);
         this->instructionsExecuted("null");
         for(int i=0; i< this->maxCycles; i++ ){
-            //std::cout<<"Fetching"<<std::endl;
             this->m_cinstruction=this->fetch();
-            //printf("Instruction: %.4X\n",m_cinstruction);
             this->DecAndEx();
-            //std::cout<<"Next Clock Cycle"<<std::endl;
             this->nextClk();
         }
         this->mem.dump("Finalmem.hex");
@@ -179,7 +174,6 @@ class CPU {
                 addr = (addr % 2 == 0) ? addr : addr - 1; //byte addressing,forget last bit doesn't matter
                 mem[addr]= (this->reg[a] & 0x00FF);//little endian so lsbs gets stored at lower mem address (store first byte at offset 0)
                 mem[addr+1]= (this->reg[a] & 0xFF00) >> 8 ;//store second byte at offset 1
-                                                           //
                 std::string instr = "SW (16bits) Value at Register " + std::to_string(a) + " ("  + std::to_string(this->reg[a]) + ") " +
                     " into Mem[" + std::to_string(addr) + "] calculated by value Reg "+ std::to_string(b)+ "(" + std::to_string(this->reg[b])+ ") + imm " + std::to_string(imm)+ " and now curr val: (" + std::to_string((mem[addr+1] << 8 ) | mem[addr]) + ")";
                 instructionsExecuted(instr.c_str()); 
@@ -206,7 +200,7 @@ class CPU {
              } break;
             case 0x7:{
                 int b = ((m_cinstruction >> 7) & 0x7 );
-                this->nextJumpOffset = 2*(this->reg[b]) ; //need pc to know it should chane its value to this 
+                this->nextJumpOffset = 2*(this->reg[b]) ; //need pc to know it should change its value to this 
                 this->reg[a] = (a != 0) ? (0.5*(this->PC+2)) : 0 ; 
                 this->JALR=1;
                 std::string instr = "JALR set PC with " + std::to_string(this->nextJumpOffset) + " and store Register " + std::to_string(a)+ " with "+ std::to_string(this->PC+2) + " if not 0 else reg0 stays 0" +
@@ -226,10 +220,9 @@ class CPU {
             this->IfileDeleted = true;
         }
 
-        // Append the instruction to the file
         if(std::string(instruction) != "null"){
             std::ofstream file("ExectutedInstructions.txt", std::ios_base::app);
-            file << "PC:"<<this->PC <<" "<<instruction << std::endl;  // Write the instruction with a newline for better readability
+            file << "PC:"<<this->PC <<" "<<instruction << std::endl;  
         }
     }
 
@@ -270,7 +263,5 @@ class CPU {
 };
 
 int main(int argc, char* argv[]){
-    //enter path
     CPU cpu(argv[1],200000);
-    //cpu.load("../test/prog.hex");
 }
