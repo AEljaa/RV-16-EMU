@@ -16,14 +16,15 @@ https://github.com/AEljaa/RV-16-EMU/blob/5007dbb34ffd4cae0a3c4a8fa817eaaf6f3af7a
 
 ### Manually building
 
-The way how I manually ran programs on this cpu was by doing the following. Please note that below I use the asembelly programs in the [`asm`](./asm/) folder, you can also write your own assembly files following the isa [`RiSC-isa`](./docs/RiSC-isa.pdf) and generate hex files from them using the assembler in the repo.
-First compile the [`assembler`](./a.c) producing a binary let's call this produced binary `assembler`
-`gcc -o assemblerold a.c`
-Second compile the [`cpu`](./RV-16.cpp) producing a binary let's call this produced binary `rv16`
-`g++ -Wall -g --std=c++2b RV-16.cpp  -o rv16`
-Third generate the hex files the CPU reads 
-`./assembler ./asm/basic_loop.s  main.hex`
-Provide the hex file to the program and the CPU will begin running.
+The way how I manually ran programs on this cpu was by doing the following. Please note that below I use the asembelly programs in the [`asm`](./asm/) folder, you can also write your own assembly files following the isa [`RiSC-isa`](./docs/RiSC-isa.pdf) and generate hex files from them using the assembler in the repo.<br/>
+
+First compile the [`assembler`](./a.c) producing a binary let's call this produced binary `assembler`.<br/>
+`gcc -o assemblerold a.c`<br/>
+Second compile the [`cpu`](./RV-16.cpp) producing a binary let's call this produced binary `rv16`.<br/>
+`g++ -Wall -g --std=c++2b RV-16.cpp  -o rv16` <br/>
+Third generate the hex files the CPU reads.<br/>
+`./assembler ./asm/basic_loop.s  main.hex`<br/>
+Provide the hex file to the program and the CPU will begin running.<br/>
 `./rv16 main.hex`
 
 ## References
