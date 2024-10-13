@@ -269,8 +269,8 @@ class CPU {
 
 };
 
-int main(){
+int main(int argc, char* argv[]){
     //enter path
-    CPU cpu("main.hex",200000);
+    CPU cpu(argv[1],200000);
     //cpu.load("../test/prog.hex");
 }
