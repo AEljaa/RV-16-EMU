@@ -12,7 +12,7 @@ The CPU is little endian and byte addressed.
 ### Using [`cpu.sh`](./cpu.sh)
 
 In order to run a program, you can use the run the bash script [`cpu.sh`](./cpu.sh) that calls cmake and make to build the assebler and cpu binaries and assemble a program specified in the asm folder, loading the hexfile generated into the intruction memory of the RV-16 cpu (ROM).
-https://github.com/AEljaa/RV-16-EMU/blob/master/cpu.sh
+https://github.com/AEljaa/RV-16-EMU/blob/5007dbb34ffd4cae0a3c4a8fa817eaaf6f3af7a7/cpu.sh#L1-L4
 
 ### Manually building
 
