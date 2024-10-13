@@ -1,8 +1,8 @@
 # RV-16-EMU
 
 ## Design Choices
-For this implementation of the RISC 16 bit cpu, I decided to have 1024 word addresses for instruction memory (ROM) and 3072 word addresses for Data memory(RAM)
-I did this since 1024 instructions in a assembly file to execute is more than enough instructions for all my use cases and I had to create a distinction between read only memory (like instructions) and data memory (like array values), to prevent the programmer from writing into instruction memory (prvent memory corruption).
+For this implementation of the RISC 16 bit cpu, I decided to have 1024 word addresses for instruction memory (ROM) and 3072 word addresses for data memory (RAM).<br/>
+I did this since 1024 instructions in a assembly file to execute is more than enough instructions for all my use cases and I had to create a distinction between read only memory (like instructions) and data memory (like array values), to prevent the programmer from writing into instruction memory (prvent memory corruption).<br/>
 The CPU is little endian and byte addressed.
 
 ## Capabilities
