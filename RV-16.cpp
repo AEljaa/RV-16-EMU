@@ -45,14 +45,24 @@ struct Memory {
             std::cerr << "Error opening file for memory dump: " << filename << std::endl;
             return;
         }
-        for (size_t i = 0; i < MAX_MEM; i++) {
-            if ((i % 2 == 0) && (i !=0 )) outfile << std::endl; // 2 bytes per line (16 bits)
-            outfile << std::hex << (int)ROM[i] << " ";
+
+        outfile << std::hex << std::uppercase; 
+
+        for (size_t i = 0; i < MAX_MEM; i += 2) {
+            if (i != 0) {
+                outfile << std::endl;
+            }
+            // 16-bit value (little endian)
+            uint16_t val = static_cast<uint16_t>(ROM[i + 1] << 8 | ROM[i]);
+            outfile << std::setw(4) << std::setfill('0') << val;
         }
+
         outfile.close();
         std::cout << "Memory dump written to " << filename << std::endl;
     }
-
+//Memory map
+//0-1023 16 bit instructions (max 1023 instructions a prog file can have)
+//1024-4095 RAM
     std::uint8_t operator[] (std::uint16_t addr) const{
         return ROM[addr];
     }
@@ -71,7 +81,7 @@ class CPU {
         //this->load(prog);
         this->mem.initialise(prog);
         this->instructionsExecuted("null");
-        while( PC < this->maxCycles ){
+        for(int i=0; i< this->maxCycles; i++ ){
             //std::cout<<"Fetching"<<std::endl;
             this->m_cinstruction=this->fetch();
             //printf("Instruction: %.4X\n",m_cinstruction);
@@ -139,7 +149,7 @@ class CPU {
             } break;
             case 0x1:{
                 int b = ((m_cinstruction >> 7) & 0x7 );
-                std::uint16_t imm = (m_cinstruction & 0x7F );
+                std::uint16_t imm = this->SignExtention(m_cinstruction & 0x7F );
                 this->reg[a]= (a != 0) ? this->reg[b]+imm : 0;
                 std::string instr = "ADDI Reg " + std::to_string(b) + " (" + std::to_string(this->reg[b]) + ")" +
                     " and 7bit imm " + std::to_string(imm) + " (" + std::to_string(imm) + ")" +
@@ -156,26 +166,30 @@ class CPU {
                 instructionsExecuted(instr.c_str()); 
              } break;
             case 0x3:{
-                std::uint16_t imm = (m_cinstruction & 0x2FF );
-                this->reg[a]= (a != 0) ? (imm << 6) : 0 ; //Place the 10 ten bits of the 16-bit imm into the 10 ten bits of regA, setting the bottom 6 bits of regA to zero
+                std::uint16_t imm = (m_cinstruction << 6);
+                this->reg[a]= (a != 0) ? imm : 0 ; //Place the 10 ten bits of the 16-bit imm into the 10 ten bits of regA, setting the bottom 6 bits of regA to zero
                 std::string instr = "LUI 10 bit " + std::to_string(imm) +
                     " into Reg " + std::to_string(a) + " and now curr val 16bit: (" + std::to_string(this->reg[a]) + ")";
                 instructionsExecuted(instr.c_str()); 
              } break;
             case 0x4:{
                 int b = ((m_cinstruction >> 7) & 0x7 );
-                std::uint16_t imm = (m_cinstruction & 0x7F );
-                std::uint16_t addr = this->reg[b] + imm;
-                mem[addr]= (this->reg[a] & 0xFF);//little endian so lsbs gets stored at lower mem address (store first byte at offset 0)
-                mem[addr+1]= (this->reg[a] << 8  & 0xFF00);//store second byte at offset 1
+                std::uint16_t imm = this->SignExtention(m_cinstruction & 0x7F );
+                std::uint16_t addr = this->reg[b] + 2*imm + 0x0400;//RAM starts from a offset of 1024
+                addr = (addr % 2 == 0) ? addr : addr - 1; //byte addressing,forget last bit doesn't matter
+                mem[addr]= (this->reg[a] & 0x00FF);//little endian so lsbs gets stored at lower mem address (store first byte at offset 0)
+                mem[addr+1]= (this->reg[a] & 0xFF00) >> 8 ;//store second byte at offset 1
+                                                           //
                 std::string instr = "SW (16bits) Value at Register " + std::to_string(a) + " ("  + std::to_string(this->reg[a]) + ") " +
-                    " into Mem[" + std::to_string(addr) + "] and now curr val: (" + std::to_string((mem[addr+1] << 8 ) | mem[addr]) + ")";
+                    " into Mem[" + std::to_string(addr) + "] calculated by value Reg "+ std::to_string(b)+ "(" + std::to_string(this->reg[b])+ ") + imm " + std::to_string(imm)+ " and now curr val: (" + std::to_string((mem[addr+1] << 8 ) | mem[addr]) + ")";
                 instructionsExecuted(instr.c_str()); 
              } break;
             case 0x5:{
                 int b = ((m_cinstruction >> 7) & 0x7 );
-                std::uint16_t imm = (m_cinstruction & 0x7F );
-                std::uint16_t addr = this->reg[b] + imm;
+                std::uint16_t imm = this->SignExtention(m_cinstruction & 0x7F );
+                std::uint16_t addr = this->reg[b] + 2*imm + 0x0400;//RAM starts from a offset of 1024
+                addr = (addr % 2 == 0) ? addr : addr - 1; //byte addressing,forget last bit doesn't matter could just do &FFFE
+
                 this->reg[a] = ((mem[addr+1] << 8 ) | mem[addr]);
                 std::string instr = "LW (16bits) Value at Mem[" + std::to_string(addr) + "] (" + std::to_string((mem[addr+1] << 8 ) | mem[addr]) + ")" +
                     " into Register " + std::to_string(a) + " ("  + std::to_string(this->reg[a]) + ") " +
@@ -184,16 +198,16 @@ class CPU {
              } break;
             case 0x6:{
                 int b = ((m_cinstruction >> 7) & 0x7 );
-                std::uint16_t imm = (m_cinstruction & 0x7F );
-                this->nextJumpOffset = (this->reg[a] == this->reg[b]) ? (2+imm) : 2 ;
+                std::uint16_t imm = this->SignExtention(m_cinstruction & 0x7F );
+                this->nextJumpOffset = (this->reg[a] == this->reg[b]) ? (2*(imm+1)) : 2 ;
                 std::string instr = "BEQ Reg " + std::to_string(a) + " (" + std::to_string(this->reg[a]) + ")" +
                     " Reg " + std::to_string(b) + " (" + std::to_string(this->reg[b]) + ") Jumpoffset = "+ std::to_string(this->nextJumpOffset);
                 instructionsExecuted(instr.c_str());
              } break;
             case 0x7:{
                 int b = ((m_cinstruction >> 7) & 0x7 );
-                this->nextJumpOffset = this->reg[b] ; //need pc to know it should chane its value to this 
-                this->reg[a] = (a != 0) ? (this->PC+2) : 0 ; 
+                this->nextJumpOffset = 2*(this->reg[b]) ; //need pc to know it should chane its value to this 
+                this->reg[a] = (a != 0) ? (0.5*(this->PC+2)) : 0 ; 
                 this->JALR=1;
                 std::string instr = "JALR set PC with " + std::to_string(this->nextJumpOffset) + " and store Register " + std::to_string(a)+ " with "+ std::to_string(this->PC+2) + " if not 0 else reg0 stays 0" +
                     " JALR flag =  " + std::to_string(this->JALR);
@@ -225,6 +239,11 @@ class CPU {
         this->JALR=0;
     }
 
+    uint16_t SignExtention(uint16_t imm){
+        uint16_t retimm= (imm>>6) ? ( imm |0xFF80) : imm;
+        return retimm;
+    }
+
      void Regdump(const char* filename) {
         std::ofstream outfile(filename);
         if (!outfile) {
@@ -243,7 +262,7 @@ class CPU {
     std::uint16_t PC = 0;
     std::uint16_t nextJumpOffset = 2;
     std::uint16_t m_cinstruction;
-    int maxCycles;
+    int maxCycles=10000;
     bool IfileDeleted = 0;
     bool JALR=0;
     Memory mem;
@@ -252,6 +271,6 @@ class CPU {
 
 int main(){
     //enter path
-    CPU cpu("main.hex",2000);
+    CPU cpu("main.hex",200000);
     //cpu.load("../test/prog.hex");
 }
