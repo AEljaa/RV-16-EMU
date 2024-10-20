@@ -27,5 +27,12 @@ Third generate the hex files the CPU reads.<br/>
 Provide the hex file to the program and the CPU will begin running.<br/>
 `./rv16 main.hex`
 
+## Assembler
+## Notes
+- [ ] Have bound correction for imm values
+- [ ] Actually implement the sb and lb instructions
+- [ ] Clean up code and remove redundant parts
+- [ ] provide psuedo instruction support
+
 ## References
 1) [RiSC-16 homepage](https://user.eng.umd.edu/~blj/RiSC/)
