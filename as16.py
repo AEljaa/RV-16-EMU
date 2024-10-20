@@ -1,5 +1,5 @@
 import sys
-opcodes= { 'add' : '000', 'addi' : '001', 'nand' : '010', 'lui' : '011', 'sw' : '100', 'sb' : 'SB','lw' : '101', 'lb' : 'LB', 'beq' : '110', 'jalr' : '111' }
+opcodes= { 'add' : '000', 'addi' : '001', 'nand' : '010', 'lui' : '011', 'sw' : '100', 'sbl' : 'SBL', 'sbu' : 'SBU', 'lw' : '101', 'lbl' : 'LBL','lbu' : 'LBU',  'beq' : '110', 'jalr' : '111' }
 regcodes= { 'r0' : '000', 'r1' : '001', 'r2' : '010', 'r3' : '011', 'r4' : '100', 'r5' : '101','r6' : '110', 'r7' : '111'}
 lines=[]
 lineaddr=[]
@@ -21,18 +21,18 @@ def placeReg():
             try:
                 lines[i][j]=regcodes[lines[i][j]] #replace the opcode with the key value if we are on it
             except:
-                print("")
+                pass
 def placeAddr():
     for i in range(0,len(lines)):
         for j in range(len(lines[i])-1,-1,-1):
             try:
-                offset=(labels[lines[i][j]]-i) #replace the opcode with the key value if we are on it
+                offset=2*(labels[lines[i][j]]-i) #byte adressed architecture so each isntruction actually contains 2 addresses
                 if(offset>0):
                     lines[i][j]=unsignextend(bin(offset)[2:],7,'0')
                 else:
                     lines[i][j]=twos_comp(int(bin(int(offset))[3:],2),7)
             except:
-                print("")
+                pass
 def switch(_type,num,bits):
     if _type == "unsigned":
         return unsignextend(num[2:],bits,'0')
@@ -42,6 +42,27 @@ def switch(_type,num,bits):
         return unsignextend(bin(int(num,16))[2:],bits,'0')
     elif _type == "oct":
         unsignextend(bin(int(num,8))[2:],bits,'0')
+
+def sb_lb():
+    for i in range(0,len(lines)):
+        print(line)
+        for j in range(len(lines[i])-1,-1,-1):
+
+            if(lines[i][j]=="SBL"):
+                lines[i][j]="100"
+                lines[i][j+3]=unsignextend(bin(int(lines[i][j+3],2)+1)[2:],7,'0')
+
+            elif(lines[i][j]=="SBU"):
+                lines[i][j]="110"
+                lines[i][j+3]=unsignextend(bin(int(lines[i][j+3],2)+1)[2:],7,'0')
+
+            elif(lines[i][j]=="LBL"):
+                lines[i][j]="101"
+                lines[i][j+3]=unsignextend(bin(int(lines[i][j+3],2)+1)[2:],7,'0')
+
+            elif(lines[i][j]=="LBU"):
+                lines[i][j]="111"
+                lines[i][j+3]=unsignextend(bin(int(lines[i][j+3],2)+1)[2:],7,'0')
 
 def preprocess(lables):
     for i,line in enumerate(lines):
@@ -97,6 +118,7 @@ def preprocess(lables):
                             lines[i][j]=twos_comp(int(bin(int(lines[i][j]))[3:],2),7)
         placeReg()
         placeAddr()
+        sb_lb()
 
 
 if __name__ == "__main__":
