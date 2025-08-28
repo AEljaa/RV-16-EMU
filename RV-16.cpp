@@ -193,15 +193,15 @@ class CPU {
             case 0x6:{
                 int b = ((m_cinstruction >> 7) & 0x7 );
                 std::uint16_t imm = this->SignExtention(m_cinstruction & 0x7F );
-                this->nextJumpOffset = (this->reg[a] == this->reg[b]) ? (2*(imm+1)) : 2 ;
+                this->nextJumpOffset = (this->reg[a] == this->reg[b]) ? imm : 2 ;
                 std::string instr = "BEQ Reg " + std::to_string(a) + " (" + std::to_string(this->reg[a]) + ")" +
                     " Reg " + std::to_string(b) + " (" + std::to_string(this->reg[b]) + ") Jumpoffset = "+ std::to_string(this->nextJumpOffset);
                 instructionsExecuted(instr.c_str());
              } break;
             case 0x7:{
                 int b = ((m_cinstruction >> 7) & 0x7 );
-                this->nextJumpOffset = 2*(this->reg[b]) ; //need pc to know it should change its value to this 
-                this->reg[a] = (a != 0) ? (0.5*(this->PC+2)) : 0 ; 
+                this->nextJumpOffset = this->reg[b] ; //need pc to know it should change its value to this 
+                this->reg[a] = (a != 0) ? (this->PC+2) : 0 ; 
                 this->JALR=1;
                 std::string instr = "JALR set PC with " + std::to_string(this->nextJumpOffset) + " and store Register " + std::to_string(a)+ " with "+ std::to_string(this->PC+2) + " if not 0 else reg0 stays 0" +
                     " JALR flag =  " + std::to_string(this->JALR);

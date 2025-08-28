@@ -29,10 +29,41 @@ Provide the hex file to the program and the CPU will begin running.<br/>
 
 ## Assembler
 ## Notes
-- [ ] Have bound correction for imm values
-- [ ] Actually implement the sb and lb instructions
+Make sure when using assembler, each address is at an even address, there are 4 additonal instructions and all of these intructions take advantage of the byte addressed design of the cpu.<br/>
+The reason each address must be even is because each address when coding in assembly for this cpu, points to the bottom byte of the data memory at that address, since 16-bit operands in memory occupy 2 bytes.
+The instructions below allow the programmer to choose which one of these bytes within these halfword length memory locations are stored into or loaded from, taking advantage of the byte addressing allowed through my design.
+###  sbl ra, rb imm
+This instruction stores a byte (the least significant byte) from ra into the mem[rb+imm],into the lower byte of this address addr(1)-[ ,xxxxxxxx]-addr(0)
+###  sbu ra, rb imm
+This instruction stores a byte (the least significant byte) from ra into the mem[rb+imm],into the upper byte of this address addr(1)-[xxxxxxxx, ]-addr(0)
+###  lbl ra, rb imm
+This instruction loads the lower byte (the least significant byte) from mem[rb+imm] and stores the byte into ra
+###  lbu ra, rb imm
+This instruction loads the upper byte (the most significant byte) from mem[rb+imm] and stores the byte into ra
+
+
+- [ ] Have bound correction for imm values and error returns
+- [x] Actually implement the sb and lb instructions
 - [ ] Clean up code and remove redundant parts
 - [ ] provide psuedo instruction support
+- [ ] work on allowing just a line with just a comment,currently this messes up my code,currently replacing the line with a noop, but that wastes a cycle for each comment 
+- [ ] need some sort of way to keep track of how many movi instructions i have and make sure that the addresses of labels are adjusted correctly, sicne each movi takes 2 instructions and effects the labels
+- [ ] jalr looks kinda cooked
+
+E.g
+Instead of
+0:movi x,y
+2: label1:
+4: movi x,label1
+=======
+0: lui
+2:addi
+4: label1:
+6: lui
+addi 
+so for each lui we hit the label must insrease by 2
+
+
 
 ## References
 1) [RiSC-16 homepage](https://user.eng.umd.edu/~blj/RiSC/)

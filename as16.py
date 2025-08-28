@@ -1,145 +1,233 @@
 import sys
-opcodes= { 'add' : '000', 'addi' : '001', 'nand' : '010', 'lui' : '011', 'sw' : '100', 'sbl' : 'SBL', 'sbu' : 'SBU', 'lw' : '101', 'lbl' : 'LBL','lbu' : 'LBU',  'beq' : '110', 'jalr' : '111' }
-regcodes= { 'r0' : '000', 'r1' : '001', 'r2' : '010', 'r3' : '011', 'r4' : '100', 'r5' : '101','r6' : '110', 'r7' : '111'}
-lines=[]
-lineaddr=[]
-labels={}
+import os
 
-def unsignextend(num,size,bit):
-    print(len(num)," bit number ",num)
-    if(len(num)<size):
-        num= bit * (size - len(num)) + num
-    return num
+opcodes = { 'add': '000', 'addi': '001', 'nand': '010', 'lui': '011', 
+           'sw': '100', 'sbl': 'SBL', 'sbu': 'SBU', 'lw': '101', 
+           'lbl': 'LBL', 'lbu': 'LBU', 'movi': 'MOVI', 'beq': '110', 'jalr': '111' }
+
+regcodes = { 'r0': '000', 'r1': '001', 'r2': '010', 'r3': '011', 
+            'r4': '100', 'r5': '101', 'r6': '110', 'r7': '111' }
+
+lines = []
+labels = {}
+movi_expansion_count = 0
+
+def unsignextend(num, size, bit):
+    return bit * (size - len(num)) + num if len(num) < size else num
 
 def twos_comp(val, bits):
     """compute the 2's complement of int value val"""
-    return bin(val - (1 << bits))[3:]        # compute negative value
+    if val >= 0:
+        return unsignextend(bin(val)[2:], bits, '0')
+    else:
+        mask = (1 << bits) - 1
+        return bin(val & mask)[2:].zfill(bits)
 
 def placeReg():
-    for i in range(0,len(lines)):
-        for j in range(len(lines[i])-1,-1,-1):
-            try:
-                lines[i][j]=regcodes[lines[i][j]] #replace the opcode with the key value if we are on it
-            except:
-                pass
+    """ Replaces register names in the code with their binary values. """
+    for line in lines:
+        for i, part in enumerate(line):
+            if part in regcodes:
+                line[i] = regcodes[part]
+
 def placeAddr():
-    for i in range(0,len(lines)):
-        for j in range(len(lines[i])-1,-1,-1):
-            try:
-                offset=2*(labels[lines[i][j]]-i) #byte adressed architecture so each isntruction actually contains 2 addresses
-                if(offset>0):
-                    lines[i][j]=unsignextend(bin(offset)[2:],7,'0')
+    """ Adjusts offsets based on labels and MOVI expansion. """
+    global movi_expansion_count
+    
+    for i, line in enumerate(lines):
+        for j, part in enumerate(line):
+            if part in labels:
+                # Calculate offset accounting for MOVI expansion
+                offset = 2 * (labels[part] - (i + movi_expansion_count))
+                
+                if offset >= 0:
+                    line[j] = unsignextend(bin(offset)[2:], 7, '0')
                 else:
-                    lines[i][j]=twos_comp(int(bin(int(offset))[3:],2),7)
-            except:
-                pass
-def switch(_type,num,bits):
+                    line[j] = twos_comp(offset, 7)
+
+def switch(_type, num, bits):
     if _type == "unsigned":
-        return unsignextend(num[2:],bits,'0')
+        return unsignextend(bin(int(num))[2:], bits, '0')
     elif _type == "signed":
-        return twos_comp(int(bin(int(num))[3:],2),7)
+        return twos_comp(int(num), bits)
     elif _type == "hex":
-        return unsignextend(bin(int(num,16))[2:],bits,'0')
+        return unsignextend(bin(int(num, 16))[2:], bits, '0')
     elif _type == "oct":
-        unsignextend(bin(int(num,8))[2:],bits,'0')
+        return unsignextend(bin(int(num, 8))[2:], bits, '0')
 
 def sb_lb():
-    for i in range(0,len(lines)):
-        print(line)
-        for j in range(len(lines[i])-1,-1,-1):
+    for i in range(len(lines)):
+        for j in range(len(lines[i])-1, -1, -1):
+            if lines[i][j] == "SBL":
+                lines[i][j] = "100"
+                if j+3 < len(lines[i]):
+                    lines[i][j+3] = unsignextend(bin(int(lines[i][j+3], 2) + 1)[2:], 7, '0')
+            elif lines[i][j] == "SBU":
+                lines[i][j] = "100"
+                if j+3 < len(lines[i]):
+                    lines[i][j+3] = unsignextend(bin(int(lines[i][j+3], 2) + 1)[2:], 7, '0')
+            elif lines[i][j] == "LBL":
+                lines[i][j] = "101"
+                if j+3 < len(lines[i]):
+                    lines[i][j+3] = unsignextend(bin(int(lines[i][j+3], 2) + 1)[2:], 7, '0')
+            elif lines[i][j] == "LBU":
+                lines[i][j] = "101"
+                if j+3 < len(lines[i]):
+                    lines[i][j+3] = unsignextend(bin(int(lines[i][j+3], 2) + 1)[2:], 7, '0')
 
-            if(lines[i][j]=="SBL"):
-                lines[i][j]="100"
-                lines[i][j+3]=unsignextend(bin(int(lines[i][j+3],2)+1)[2:],7,'0')
+def handleMOVI(line):
+    """Handle MOVI instruction expansion to LUI and ADDI."""
+    global movi_expansion_count
+    movi_expansion_count += 1  # Track MOVI expansion
+    
+    if line[1] in regcodes:
+        reg = regcodes[line[1]]
+    else:
+        reg = line[1]
+    
+    # Parse the immediate value
+    imm_str = line[2]
+    if imm_str in labels:
+        imm_val = labels[imm_str] * 2  # Convert to byte address
+    else:
+        # Handle different number formats
+        if imm_str.startswith('0x'):
+            imm_val = int(imm_str, 16)
+        elif imm_str.startswith('0o'):
+            imm_val = int(imm_str, 8)
+        elif imm_str.startswith('0b'):
+            imm_val = int(imm_str, 2)
+        else:
+            imm_val = int(imm_str)
+    
+    # Split into upper and lower parts
+    upper = (imm_val >> 6) & 0x3FF  # 10 bits
+    lower = imm_val & 0x3F  # 6 bits
+    
+    # Generate LUI and ADDI instructions
+    lui_instr = [opcodes['lui'], reg, unsignextend(bin(upper)[2:], 10, '0')]
+    addi_instr = [opcodes['addi'], reg, reg, unsignextend(bin(lower)[2:], 7, '0')]
+    
+    return lui_instr + addi_instr
 
-            elif(lines[i][j]=="SBU"):
-                lines[i][j]="110"
-                lines[i][j+3]=unsignextend(bin(int(lines[i][j+3],2)+1)[2:],7,'0')
+def preprocess():
+    """First pass: process labels and basic instruction parsing."""
+    global movi_expansion_count
+    movi_expansion_count = 0
+    
+    # First, collect all labels
+    instruction_count = 0
+    for i, line in enumerate(lines):
+        if ':' in line:
+            label_part = line.split(':')[0].strip()
+            labels[label_part] = instruction_count
+            line = line.split(':', 1)[1].strip()
+        
+        if line and not line.startswith('#'):
+            tokens = line.split()
+            if tokens and tokens[0] == 'movi':
+                instruction_count += 2  # MOVI expands to two instructions
+            else:
+                instruction_count += 1
+    
+    # Second pass: process instructions
+    new_lines = []
+    for i, line in enumerate(lines):
+        # Remove comments
+        if '#' in line:
+            line = line[:line.find('#')].strip()
+        
+        # Handle labels
+        if ':' in line:
+            line = line.split(':', 1)[1].strip()
+        
+        if not line or line.isspace():
+            continue
+        
+        # Replace commas with spaces and split
+        line = line.replace(',', ' ').split()
+        
+        # Replace opcodes and registers
+        for j, part in enumerate(line):
+            if part in opcodes:
+                line[j] = opcodes[part]
+            elif part in regcodes:
+                line[j] = regcodes[part]
+        
+        # Handle special cases
+        if line[0] == opcodes['lui'] and len(line) > 2:
+            # Process LUI immediate value
+            imm = line[2]
+            if imm.startswith('0x'):
+                line[2] = unsignextend(bin(int(imm, 16))[2:], 10, '0')
+            elif imm.startswith('0o'):
+                line[2] = unsignextend(bin(int(imm, 8))[2:], 10, '0')
+            elif imm.startswith('0b'):
+                line[2] = unsignextend(imm[2:], 10, '0')
+            else:
+                line[2] = unsignextend(bin(int(imm))[2:], 10, '0')
+        
+        elif line[0] == 'MOVI':
+            # Handle MOVI expansion
+            expanded = handleMOVI(line)
+            new_lines.extend([expanded[:4], expanded[4:]])
+            continue
+        
+        elif line[0] in ['000', '010']:  # ADD or NAND
+            if len(line) < 5:
+                line.append('0000')
+        
+        new_lines.append(line)
+    
+    # Replace original lines with processed lines
+    lines.clear()
+    lines.extend(new_lines)
 
-            elif(lines[i][j]=="LBL"):
-                lines[i][j]="101"
-                lines[i][j+3]=unsignextend(bin(int(lines[i][j+3],2)+1)[2:],7,'0')
-
-            elif(lines[i][j]=="LBU"):
-                lines[i][j]="111"
-                lines[i][j+3]=unsignextend(bin(int(lines[i][j+3],2)+1)[2:],7,'0')
-
-def preprocess(lables):
-    for i,line in enumerate(lines):
-        lines[i]=line.strip()
-        if(lines[i].find('#') != -1):
-            lines[i]=line[0:lines[i].find('#')].strip() #remove the comments
-        lines[i]=lines[i].replace(',',' ') #remove commas, since we will spilt opcodes up
-        if(line.find(':') != -1):
-            labels[lines[i][0:lines[i].find(':')]]=i #assign the line number (after removing empty spaces) as the adress
-            lines[i] = lines[i][lines[i].find(':')+1:].strip()
-       # nop and .fill can be done here 
-        lines[i]=lines[i].split() 
-        for j in range(len(lines[i])-1,-1,-1):
-            try:
-                lines[i][j]=opcodes[lines[i][j]] #replace the opcode with the key value if we are on it
-                # Deal with 10 bit LUI immideates
-                if(lines[i][j]=='011'): #10 bit lui imm values
-                    if(lines[i][j+2].isdigit()):
-                        lines[i][j+2]=unsignextend(bin(int(lines[i][j+2]) >> 6)[2:],10,'0') #max imm for lui is 32768
-
-                    if(lines[i][j+2].find('0x') != -1): #hex values 0xaaa
-                       #lines[i][j]=unsignextend(bin(int(lines[i][j],16))[2:],7,'0')
-                       lines[i][j+2]=switch("hex",lines[i][j+2],10)
-
-                    elif(lines[i][j+2].find('0o') != -1): #oct values 0oaaa
-                        lines[i][j]=switch("oct",lines[i][j+2],10)
-
-                    elif(lines[i][j+2].find('0b') != -1): #binary values
-                        lines[i][j]=switch("unsigned",lines[i][j+2],10)
-            except:
-                if(lines[i][0] != "lui"):
-                    if(lines[i][j].find('0x') != -1): #hex values 0xaaa
-                       #lines[i][j]=unsignextend(bin(int(lines[i][j],16))[2:],7,'0')
-                       lines[i][j]=switch("hex",lines[i][j],7)
-
-                    elif(lines[i][j].find('0o') != -1): #oct values 0oaaa
-                        lines[i][j]=switch("oct",lines[i][j],7)
-
-                    elif(lines[i][j].find('0b') != -1): #binary values
-                        lines[i][j]=switch("unsigned",lines[i][j],7)
-
-                    elif((opcodes.get(lines[i][j],0) or regcodes.get(lines[i][j],0)) == 0):
-                        if(labels.get(lines[i][j])):
-                            continue
-
-                        elif(lines[i][j]=="halt"):
-                            lines[i]="1110000000000000"
-
-                        elif(lines[i][j].isdigit()):#positive numbers
-                            lines[i][j]=unsignextend(bin(int(lines[i][j]))[2:],7,'0')
-
-                        elif(lines[i][j][0]=='-' and lines[i][j][1:].isdigit()):#negative numbers
-                            lines[i][j]=twos_comp(int(bin(int(lines[i][j]))[3:],2),7)
-        placeReg()
-        placeAddr()
-        sb_lb()
-
+def write_hex(output_file):
+    """Write the assembled code to a hex file."""
+    try:
+        if os.path.exists(output_file):
+            os.remove(output_file)
+    except:
+        pass
+    
+    with open(output_file, 'w') as f:
+        for line in lines:
+            # Convert to binary string
+            bin_str = ''.join(str(bit) for bit in line)
+            
+            # Pad to 16 bits if needed
+            if len(bin_str) < 16:
+                bin_str = bin_str.ljust(16, '0')
+            elif len(bin_str) > 16:
+                bin_str = bin_str[:16]  # Truncate to 16 bits
+            
+            # Convert to hex
+            hex_val = format(int(bin_str, 2), '04X')
+            
+            # Write in little-endian format
+            f.write(hex_val[2:4] + hex_val[0:2] + '\n')
 
 if __name__ == "__main__":
-    if(len(sys.argv)!=2):
-        print('Usage: python as16.py <assembly_file_name> -o <hex_file_name>')
+    if len(sys.argv) < 5 or sys.argv[1] != '-s' or sys.argv[3] != '-o':
+        print('Usage: python as16.py -s <source_assembly_file_name> -o <dest_hex_file_name>')
         exit(1)
-    try:
-        file = open(sys.argv[1],'r')
-    except:
-        print(f"File ./{sys.argv[1]} does not exist")
-        exit(1)
-    while True:
-        line= file.readline()
-        if not line:
-            break #if at eof then exit loop
-        if(line.strip()==""): #if line is empty then remove
-            continue
-        lines.append(line.strip())
-    file.close()
-    # pass 1
-    preprocess(labels)
-    print(lines)
-
-
+    
+    # Read input file
+    with open(sys.argv[2], 'r') as file:
+        lines = file.readlines()
+    
+    # Preprocess
+    preprocess()
+    
+    # Place addresses
+    placeAddr()
+    
+    # Place registers
+    placeReg()
+    
+    # Handle special load/store instructions
+    sb_lb()
+    
+    # Write output
+    write_hex(sys.argv[4])
